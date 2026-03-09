@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>省份数据地图</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts/map/js/china.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 :root {
@@ -45,8 +46,7 @@ body::after { content:''; position:fixed; inset:0; background-image:linear-gradi
 .prov-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:5px; cursor:pointer; transition:background .15s; }
 .prov-row:hover { background:rgba(0,180,255,.07); }
 .prov-row.sel { background:rgba(0,180,255,.13); }
-.prow-pip { width:5px; height:5px; border-radius:50%; flex-shrink:0; transition:box-shadow .15s; }
-.prov-row.sel .prow-pip { box-shadow:0 0 6px currentColor; }
+.prow-pip { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
 .prow-name { font-size:13px; color:var(--text); flex:1; }
 .prow-arr { font-size:12px; color:var(--muted); transition:all .15s; }
 .prov-row:hover .prow-arr, .prov-row.sel .prow-arr { color:var(--accent); transform:translateX(2px); }
@@ -118,6 +118,7 @@ var REGION_COLOR = {'华北':'#1a5a9a','东北':'#0d6a4a','华东':'#1a3a8a','�
 var REGION_ACCENT = {'华北':'#4ab0ff','东北':'#00dd88','华东':'#3399ff','华中':'#bb55ff','华南':'#00dddd','西南':'#ffbb33','西北':'#ff7733','港澳台':'#888888'};
 var PROV_MAP = {};
 PROVINCES.forEach(function(p){ PROV_MAP[p.id] = p; });
+
 var listEl = document.getElementById('prov-list');
 var REGIONS = ['华北','东北','华东','华中','华南','西南','西北','港澳台'];
 REGIONS.forEach(function(rg){
@@ -135,22 +136,51 @@ REGIONS.forEach(function(rg){
     listEl.appendChild(row);
   });
 });
-var chart = echarts.init(document.getElementById('map'), null, {renderer:'svg'});
-fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json')
-  .then(function(r){ return r.json(); })
-  .then(function(geoJson){ echarts.registerMap('china', geoJson); renderMap(); });
+
+var chart = echarts.init(document.getElementById('map'), null, {renderer:'canvas'});
+
 function renderMap(){
   var mapData = PROVINCES.map(function(p){
     return { name:p.id, value:1, itemStyle:{ areaColor: REGION_COLOR[p.region]||'#1a3060' } };
   });
   chart.setOption({
     backgroundColor:'transparent',
-    tooltip:{ show:true, formatter:function(params){ var p=PROV_MAP[params.name]; if(!p) return params.name; return '<span style="color:#00c8ff;font-weight:500">'+p.id+'</span><br/><span style="color:#4a7090;font-size:11px">'+p.region+'</span>'; }, backgroundColor:'rgba(8,16,32,0.95)', borderColor:'rgba(0,180,255,0.5)', borderWidth:1, textStyle:{color:'#c8dff0',fontSize:13} },
-    series:[{ type:'map', map:'china', roam:true, zoom:1.18, center:[105,38], scaleLimit:{min:0.8,max:6}, data:mapData, nameProperty:'name', label:{ show:true, fontSize:9, color:'rgba(180,220,255,0.75)', fontFamily:'Noto Sans SC,PingFang SC,sans-serif' }, emphasis:{ label:{show:true,color:'#fff',fontSize:10}, itemStyle:{areaColor:'rgba(0,200,255,0.5)',borderColor:'#00c8ff',borderWidth:1.5} }, select:{ label:{show:true,color:'#fff',fontSize:10,fontWeight:600}, itemStyle:{areaColor:'rgba(0,200,255,0.6)',borderColor:'#00e0ff',borderWidth:2} }, selectedMode:'single', itemStyle:{borderColor:'rgba(0,160,220,0.45)',borderWidth:0.7} }]
+    tooltip:{
+      show:true,
+      formatter:function(params){
+        var p=PROV_MAP[params.name];
+        if(!p) return params.name;
+        return '<span style="color:#00c8ff;font-weight:500">'+p.id+'</span><br/><span style="color:#4a7090;font-size:11px">'+p.region+'</span>';
+      },
+      backgroundColor:'rgba(8,16,32,0.95)',
+      borderColor:'rgba(0,180,255,0.5)',
+      borderWidth:1,
+      textStyle:{color:'#c8dff0',fontSize:13}
+    },
+    series:[{
+      type:'map', map:'china', roam:true, zoom:1.18, center:[105,38],
+      scaleLimit:{min:0.8,max:6},
+      data:mapData,
+      label:{ show:true, fontSize:9, color:'rgba(180,220,255,0.75)', fontFamily:'Noto Sans SC,PingFang SC,sans-serif' },
+      emphasis:{ label:{show:true,color:'#fff',fontSize:10}, itemStyle:{areaColor:'rgba(0,200,255,0.5)',borderColor:'#00c8ff',borderWidth:1.5} },
+      select:{ label:{show:true,color:'#fff',fontSize:10,fontWeight:600}, itemStyle:{areaColor:'rgba(0,200,255,0.6)',borderColor:'#00e0ff',borderWidth:2} },
+      selectedMode:'single',
+      itemStyle:{borderColor:'rgba(0,160,220,0.45)',borderWidth:0.7}
+    }]
   });
   chart.on('click', function(params){ if(params.componentType==='series') selectProv(params.name); });
 }
+
+// 等地图脚本加载完再渲染
+if(typeof echarts.getMap('china') !== 'undefined' || window.chinaMapLoaded){
+  renderMap();
+} else {
+  window.addEventListener('load', function(){ renderMap(); });
+  setTimeout(renderMap, 500);
+}
+
 window.addEventListener('resize', function(){ chart.resize(); });
+
 var currentProv = null;
 function selectProv(name){
   var p = PROV_MAP[name];
